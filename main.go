@@ -12,7 +12,9 @@ func main() {
 	container := restful.NewContainer()
 	ws := new(restful.WebService)
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.GetContainerLog))
+	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
 	ws.Route(ws.GET("/pod/").To(pod.Home))
+	ws.Route(ws.GET("/exec/").To(pod.Exec))
 	container.Add(ws)
 	fmt.Println("SERVER 9999")
 
@@ -24,6 +26,6 @@ func main() {
 		CookiesAllowed: false,
 		Container:      container}
 	container.Filter(cors.Filter)
-
+	container.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	log.Fatal(http.ListenAndServe(":9999", container))
 }

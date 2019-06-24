@@ -25,7 +25,20 @@ var upgrader = websocket.Upgrader{
 }
 
 func Home(request *restful.Request, response *restful.Response) {
-	homeTemplate.Execute(response, request.Request.Host)
+	template, err := template.ParseFiles("./view/container_log.html")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	template.Execute(response, request.Request.Host)
+}
+func Exec(request *restful.Request, response *restful.Response) {
+	template, err := template.ParseFiles("./view/container_exec.html")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	template.Execute(response, request.Request.Host)
 }
 
 var homeTemplate = template.Must(template.New("").Parse(`
