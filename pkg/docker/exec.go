@@ -5,11 +5,19 @@ import (
 	"github.com/astaxie/beego/httplib"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
+	"github.com/weibaohui/podInteractive/pkg/constant"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 )
+
+type terminal struct {
+	conn        *websocket.Conn
+	Address     string
+	ContainerId string
+	shellId     string
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -35,81 +43,27 @@ type execStartParam struct {
 	Tty    bool `json:"Tty"`
 }
 
-func netConn(execid string) {
-	conn, err := net.Dial("tcp", "134.44.36.120:2376")
+func execShellStream(t *terminal) {
+
+	tcpConn, err := net.Dial("tcp", t.Address)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	defer tcpConn.Close()
 	data := "{\"Tty\":true}"
 	dataLength := len([]byte(data))
-	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", execid, "134.44.36.120:2376", fmt.Sprint(dataLength), data)
-	_, err = conn.Write([]byte(body))
-	if err != nil {
-		log.Println(err)
-	}
-}
-func Exec(req *restful.Request, resp *restful.Response) {
-
-	c, err := upgrader.Upgrade(resp, req.Request, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return
-	}
-	defer c.Close()
-
-	url := "http://134.44.36.120:2376/containers/f441cd3e0d5f1/exec"
-	//{
-	//	"AttachStdin": true,
-	//	"AttachStdout": true,
-	//	"AttachStderr": true,
-	//	"Cmd": ["sh"],
-	//	"DetachKeys": "ctrl-p,ctrl-q",
-	//	"Privileged": true,
-	//	"Tty": true
-	//}
-	param := &execParam{
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd:          []string{"/bin/sh"},
-		DetachKeys:   "ctrl-p,ctrl-q",
-		Privileged:   true,
-		Tty:          true,
-	}
-	request, err := httplib.Post(url).JSONBody(param)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	execId := &execId{}
-	err = request.ToJSON(execId)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	fmt.Println(execId.Id)
-
-	conn, err := net.Dial("tcp", "134.44.36.120:2376")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer conn.Close()
-	data := "{\"Tty\":true}"
-	dataLength := len([]byte(data))
-	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", execId.Id, "134.44.36.120:2376", fmt.Sprint(dataLength), data)
-	_, err = conn.Write([]byte(body))
+	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.shellId, t.Address, fmt.Sprint(dataLength), data)
+	_, err = tcpConn.Write([]byte(body))
 	if err != nil {
 		log.Println(err)
 	}
 
 	go func() {
 		for {
-
 			bytes := make([]byte, 128)
-			_, err := conn.Read(bytes)
-			c.WriteMessage(websocket.TextMessage, bytes)
+			_, err := tcpConn.Read(bytes)
+			t.conn.WriteMessage(websocket.TextMessage, bytes)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
@@ -119,7 +73,7 @@ func Exec(req *restful.Request, resp *restful.Response) {
 	}()
 
 	for {
-		_, r, err := c.NextReader()
+		_, r, err := t.conn.NextReader()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -129,6 +83,53 @@ func Exec(req *restful.Request, resp *restful.Response) {
 			fmt.Println(err.Error())
 			return
 		}
-		conn.Write(bytes)
+		tcpConn.Write(bytes)
 	}
+}
+
+func shellId(t *terminal) (string, error) {
+	// url := "http://134.44.36.120:2376/containers/f441cd3e0d5f1/exec"
+	url := fmt.Sprintf("http://%s/contaners/%s/exec", t.Address, t.ContainerId)
+
+	param := &execParam{
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          constant.DefaultCommand,
+		DetachKeys:   "ctrl-p,ctrl-q",
+		Privileged:   true,
+		Tty:          true,
+	}
+	request, err := httplib.Post(url).JSONBody(param)
+	if err != nil {
+		return "", err
+	}
+	execId := &execId{}
+	err = request.ToJSON(execId)
+	if err != nil {
+		return "", err
+	}
+	return execId.Id, nil
+}
+func Exec(req *restful.Request, resp *restful.Response) {
+
+	c, err := upgrader.Upgrade(resp, req.Request, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	defer c.Close()
+	t := &terminal{
+		conn:        c,
+		Address:     "134.44.36.120:2376",
+		ContainerId: "dd77b060d4c2",
+	}
+	shellId, err := shellId(t)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	t.shellId = shellId
+
+	execShellStream(t)
 }

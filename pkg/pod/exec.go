@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
+	"github.com/weibaohui/podInteractive/pkg/constant"
 	"github.com/weibaohui/podInteractive/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +84,6 @@ func PodExec(request *restful.Request, response *restful.Response) {
 }
 
 func executor(t *terminal) error {
-	var defaultCommand = []string{"/bin/sh", "-c", `TERM=xterm-256color; export TERM; [ -x /bin/bash ] && ([ -x /usr/bin/script ] && /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) || exec /bin/sh`}
 
 	req := utils.Cli().CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -97,7 +97,7 @@ func executor(t *terminal) error {
 				Stdout:    true,
 				TTY:       true,
 				Container: t.containerName,
-				Command:   defaultCommand,
+				Command:   constant.DefaultCommand,
 			},
 			scheme.ParameterCodec,
 		)
