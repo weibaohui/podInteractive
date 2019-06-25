@@ -23,6 +23,7 @@ func Log(req *restful.Request, resp *restful.Response) {
 		Address:     "134.44.36.120:2376",
 		ContainerId: "578445bc",
 	}
+
 	url := fmt.Sprintf("http://%s/containers/%s/logs?stderr=1&stdout=1&follow=1", t.Address, t.ContainerId)
 	response, err := httplib.Get(url).Response()
 	if err != nil {
