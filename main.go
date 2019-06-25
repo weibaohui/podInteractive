@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/emicklei/go-restful"
+	"github.com/weibaohui/podInteractive/pkg/docker"
 	"github.com/weibaohui/podInteractive/pkg/page"
 	"github.com/weibaohui/podInteractive/pkg/pod"
 	"github.com/weibaohui/podInteractive/pkg/utils"
@@ -25,6 +26,9 @@ func main() {
 	ws.Route(ws.GET("/log").To(page.Log))
 	ws.Route(ws.GET("/exec").To(page.Exec))
 	ws.Route(ws.GET("/").To(page.Index))
+
+	ws.Route(ws.GET("/docker/exec").To(docker.Exec))
+
 	container.Add(ws)
 
 	// Add container filter to enable CORS
