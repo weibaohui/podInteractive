@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: podinteractive
+  labels:
+    app: podinteractive
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: podinteractive
+      labels:
+        app: podinteractive
+    spec:
+      containers:
+        - name: podinteractive
+          image: weibh/podinteractive
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      serviceAccountName: podinteractive
+  selector:
+    matchLabels:
+      app: podinteractive
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: podinteractive
+spec:
+  selector:
+    app: podinteractive
+  ports:
+    - port: 9999
+      targetPort: 9999
+  type: NodePort
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: podinteractive
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  namespace: default
+  name: podinteractive-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: podinteractive-role
+subjects:
+  - kind: ServiceAccount
+    name: podinteractive
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: podinteractive-role
+  namespace: default
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
