@@ -3,20 +3,21 @@ package main
 import (
 	"fmt"
 	"github.com/emicklei/go-restful"
+	"github.com/weibaohui/podInteractive/pkg/page"
 	"github.com/weibaohui/podInteractive/pkg/pod"
 	"log"
 	"net/http"
 )
 
 func main() {
+	fmt.Println("SERVER 9999")
 	container := restful.NewContainer()
 	ws := new(restful.WebService)
-	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.GetContainerLog))
+	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.PodLog))
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
-	ws.Route(ws.GET("/pod/").To(pod.Home))
-	ws.Route(ws.GET("/exec/").To(pod.Exec))
+	ws.Route(ws.GET("/log/").To(page.Log))
+	ws.Route(ws.GET("/exec/").To(page.Exec))
 	container.Add(ws)
-	fmt.Println("SERVER 9999")
 
 	// Add container filter to enable CORS
 	cors := restful.CrossOriginResourceSharing{

@@ -6,20 +6,18 @@
     <script src="/static/js/xterm/xterm.js"></script>
     <style>
         .xterm-screen {
-            width: 1519px!important;
-            height: 800px!important;
+            height: 600px !important;
         }
     </style>
 </head>
 <body>
 <form>
     <button id="open">获取日志</button>
-    <button id="close">关闭</button>
-    <p>ns:<input id="ns" type="text" value="default">
-    <p>podName<input id="podName" type="text" value="podName">
-    <p>containerName<input id="containerName" type="text" value="">
+    <p>ns:<input id="ns" type="text" value="default"></p>
+    <p>podName<input id="podName" type="text" value="podName"></p>
+    <p>containerName<input id="containerName" type="text" value=""></p>
 </form>
-<div id="terminal"  ></div>
+<div id="terminal"></div>
 </body>
 
 <script>
@@ -62,14 +60,13 @@
     }
 
 
-
     var ws;
     var term = new Terminal({
         cursorBlink: true,
         useStyle: true,
         fontSize: 12,
     });
-    document.getElementById("open").onclick = function(evt) {
+    document.getElementById("open").onclick = function (evt) {
 
         if (ws) {
             return false;
@@ -77,7 +74,7 @@
         var ns = document.getElementById("ns").value;
         var podName = document.getElementById("podName").value;
         var containerName = document.getElementById("containerName").value;
-        var path="ws://{{.}}/ns/"+ns+"/podName/"+podName+"/log?containerName="+containerName
+        var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/log?containerName=" + containerName
         ws = new WebSocket(path);
 
 

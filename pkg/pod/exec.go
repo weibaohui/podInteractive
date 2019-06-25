@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
-	"github.com/weibaohui/podInteractive/pkg"
+	"github.com/weibaohui/podInteractive/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -33,7 +33,6 @@ func (t *terminal) Read(p []byte) (n int, err error) {
 		t.size <- &size
 		return 0, nil
 	} else {
-		fmt.Println(err.Error())
 		return copy(p, ps), nil
 	}
 }
@@ -86,7 +85,7 @@ func PodExec(request *restful.Request, response *restful.Response) {
 func executor(t *terminal) error {
 	var defaultCommand = []string{"/bin/sh", "-c", `TERM=xterm-256color; export TERM; [ -x /bin/bash ] && ([ -x /usr/bin/script ] && /usr/bin/script -q -c "/bin/bash" /dev/null || exec /bin/bash) || exec /bin/sh`}
 
-	req := pkg.Cli().CoreV1().RESTClient().Post().
+	req := utils.Cli().CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(t.podName).
 		Namespace(t.ns).
@@ -102,7 +101,7 @@ func executor(t *terminal) error {
 			},
 			scheme.ParameterCodec,
 		)
-	restConfig, err := clientcmd.BuildConfigFromFlags("", "/Users/baohui/.kube/config")
+	restConfig, err := clientcmd.BuildConfigFromFlags("", "/Users/weibh/.kube/config")
 	if err != nil {
 		fmt.Errorf("clientcmd.BuildConfigFromFlags =%s ", err.Error())
 		return err
