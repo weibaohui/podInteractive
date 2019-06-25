@@ -22,8 +22,9 @@ func main() {
 	ws := new(restful.WebService)
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.PodLog))
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
-	ws.Route(ws.GET("/log/").To(page.Log))
-	ws.Route(ws.GET("/exec/").To(page.Exec))
+	ws.Route(ws.GET("/log").To(page.Log))
+	ws.Route(ws.GET("/exec").To(page.Exec))
+	ws.Route(ws.GET("/").To(page.Index))
 	container.Add(ws)
 
 	// Add container filter to enable CORS

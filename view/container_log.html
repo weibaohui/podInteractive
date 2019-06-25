@@ -11,15 +11,8 @@
     </style>
 </head>
 <body>
-<form>
-    <button id="open">获取日志</button>
-    <p>ns:<input id="ns" type="text" value="default"></p>
-    <p>podName<input id="podName" type="text" value="podName"></p>
-    <p>containerName<input id="containerName" type="text" value=""></p>
-</form>
 <div id="terminal"></div>
 </body>
-
 <script>
     //获取QueryString的数组
     function getQueryString() {
@@ -66,37 +59,29 @@
         useStyle: true,
         fontSize: 12,
     });
-    document.getElementById("open").onclick = function (evt) {
 
-        if (ws) {
-            return false;
-        }
-        var ns = document.getElementById("ns").value;
-        var podName = document.getElementById("podName").value;
-        var containerName = document.getElementById("containerName").value;
-        var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/log?containerName=" + containerName
-        ws = new WebSocket(path);
+    var ns = getQueryStringByName("ns");
+    var podName = getQueryStringByName("podName");
+    var containerName = getQueryStringByName("containerName");
+    var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/log?containerName=" + containerName
+    ws = new WebSocket(path);
 
 
-        term.open(document.getElementById('terminal'));
-        fit();
-        ws.onopen = function (evt) {
-            term.writeln("connected");
-        }
-        ws.onclose = function (evt) {
-            term.writeln("CLOSE");
-            ws = null;
-        }
-        ws.onmessage = function (evt) {
-            term.writeln(evt.data);
-            term.focus();
-        }
-        ws.onerror = function (evt) {
-            term.writeln("ERROR: " + evt.data);
-        }
-        return false;
-    };
-
+    term.open(document.getElementById('terminal'));
+    fit();
+    ws.onopen = function (evt) {
+    }
+    ws.onclose = function (evt) {
+        term.writeln("CLOSE");
+        ws = null;
+    }
+    ws.onmessage = function (evt) {
+        term.writeln(evt.data);
+        term.focus();
+    }
+    ws.onerror = function (evt) {
+        term.writeln("ERROR: " + evt.data);
+    }
 
     function proposeGeometry(term) {
         if (!term.element.parentElement) {

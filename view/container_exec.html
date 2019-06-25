@@ -9,12 +9,6 @@
     </style>
 </head>
 <body>
-<form>
-    <button id="open">Exec into Pod</button>
-    <p>ns:<input id="ns" type="text" value="default"></p>
-    <p>podName<input id="podName" type="text" value="podName"></p>
-    <p>containerName<input id="containerName" type="text" value=""></p>
-</form>
 <div id="terminal"></div>
 <script>
     //获取QueryString的数组
@@ -63,43 +57,44 @@
     });
     term.open(document.getElementById('terminal'));
 
-    document.getElementById("open").onclick = function (evt) {
 
-        if (ws) {
-            return false;
-        }
-        var ns = document.getElementById("ns").value;
-        var podName = document.getElementById("podName").value;
-        var containerName = document.getElementById("containerName").value;
-        var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/exec?containerName=" + containerName
-        ws = new WebSocket(path);
+    var ns = getQueryStringByName("ns");
+    var podName = getQueryStringByName("podName");
+    var containerName = getQueryStringByName("containerName");
+    var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/exec?containerName=" + containerName
+    ws = new WebSocket(path);
 
-        ws.onopen = function (evt) {
-            term.writeln("connected");
-            term.focus();
-            fit();
-            // setTimeout(function() { fit();}, 2000);
-        };
-        ws.onmessage = function (evt) {
-            term.write(evt.data);
-        };
-        ws.onerror = function (evt) {
-            term.writeln("ERROR: " + evt.data);
-            // term.destroy();
-        };
-        ws.onclose = function (evt) {
-            term.writeln("CLOSE");
-            // term.destroy();
-        };
-
-        term.on("data", function (evt) {
-            ws.send(evt);
-        });
-
-
-        return false;
+    ws.onopen = function (evt) {
+    };
+    ws.onmessage = function (evt) {
+        term.write(evt.data);
+        term.focus();
+    };
+    ws.onerror = function (evt) {
+        term.writeln("ERROR: " + evt.data);
+        // term.destroy();
+    };
+    ws.onclose = function (evt) {
+        term.writeln("CLOSE");
+        // term.destroy();
     };
 
+    term.on("data", function (evt) {
+        ws.send(evt);
+    });
+
+
+    function waitForConnection(callback, interval) {
+        if (ws.readyState === 1) {
+            callback();
+        } else {
+            var that = this;
+            // optional: implement backoff for interval here
+            setTimeout(function () {
+                waitForConnection(callback, interval);
+            }, interval);
+        }
+    };
 
     function proposeGeometry(term) {
         if (!term.element.parentElement) {
@@ -134,12 +129,20 @@
                 term.resize(geometry.cols, geometry.rows);
             }
         }
-        // if (ws && term)
-        //     ws.send(JSON.stringify({
-        //         Width: term.cols,
-        //         Height: term.rows
-        //     }));
+        if (ws && term) {
+            // ws.send(JSON.stringify({
+            //     Width: term.cols,
+            //     Height: term.rows
+            // }));
+        }
+
+
     }
+
+    waitForConnection(function () {
+        fit()
+    }, 1000);
+
 
 </script>
 </body>
