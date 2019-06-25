@@ -101,7 +101,7 @@ func executor(t *terminal) error {
 			},
 			scheme.ParameterCodec,
 		)
-	restConfig, err := clientcmd.BuildConfigFromFlags("", "/Users/weibh/.kube/config")
+	restConfig, err := clientcmd.BuildConfigFromFlags("", utils.KubeConfigPath())
 	if err != nil {
 		fmt.Errorf("clientcmd.BuildConfigFromFlags =%s ", err.Error())
 		return err

@@ -7,7 +7,7 @@ import (
 )
 
 func Cli() *kubernetes.Clientset {
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/weibh/.kube/config")
+	config, err := clientcmd.BuildConfigFromFlags("", KubeConfigPath())
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -16,4 +16,13 @@ func Cli() *kubernetes.Clientset {
 		log.Fatal(err.Error())
 	}
 	return clientset
+}
+
+var kubeConfigPath string
+
+func SetPath(path string) {
+	kubeConfigPath = path
+}
+func KubeConfigPath() string {
+	return kubeConfigPath
 }

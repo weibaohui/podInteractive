@@ -1,15 +1,22 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/weibaohui/podInteractive/pkg/page"
 	"github.com/weibaohui/podInteractive/pkg/pod"
+	"github.com/weibaohui/podInteractive/pkg/utils"
 	"log"
 	"net/http"
 )
 
 func main() {
+	var path string
+	flag.StringVar(&path, "kubeconfig", "", "kubernetes config path")
+	flag.Parse()
+	utils.SetPath(path)
+
 	fmt.Println("SERVER 9999")
 	container := restful.NewContainer()
 	ws := new(restful.WebService)
