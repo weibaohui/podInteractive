@@ -76,10 +76,9 @@
 
         ws.onopen = function (evt) {
             term.writeln("connected");
-
             term.focus();
             fit();
-
+            // setTimeout(function() { fit();}, 2000);
         };
         ws.onmessage = function (evt) {
             term.write(evt.data);
@@ -135,10 +134,11 @@
                 term.resize(geometry.cols, geometry.rows);
             }
         }
-        ws.send(JSON.stringify({
-            Width: term.cols,
-            Height: term.rows
-        }));
+        // if (ws && term)
+        //     ws.send(JSON.stringify({
+        //         Width: term.cols,
+        //         Height: term.rows
+        //     }));
     }
 
 </script>
