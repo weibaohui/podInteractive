@@ -28,6 +28,7 @@ func main() {
 	ws.Route(ws.GET("/").To(page.Index))
 
 	ws.Route(ws.GET("/docker/exec").To(docker.Exec))
+	ws.Route(ws.GET("/docker/log").To(docker.Log))
 
 	container.Add(ws)
 

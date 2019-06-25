@@ -117,11 +117,10 @@ func ReadLog(ctx context.Context, eg *errgroup.Group, logEvent chan []byte, ns, 
 			fmt.Println("Stream", err)
 			return err
 		}
+		reader := bufio.NewReader(readCloser)
 		for {
-			reader := bufio.NewReader(readCloser)
-			bytes, err := reader.ReadBytes('\n')
-			ss := bytes[:len(bytes)-1]
-			logEvent <- ss
+			line, _, err := reader.ReadLine()
+			logEvent <- line
 			if err == io.EOF {
 				break
 			}
