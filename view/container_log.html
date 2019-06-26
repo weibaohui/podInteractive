@@ -6,7 +6,7 @@
     <script src="/static/js/xterm/xterm.js"></script>
     <style>
         .xterm-screen {
-            height: 600px !important;
+            height: 700px !important;
         }
     </style>
 </head>
@@ -48,6 +48,7 @@
 
     term.open(document.getElementById('terminal'));
     ws.onopen = function (evt) {
+        fit();
     }
     ws.onclose = function (evt) {
         term.writeln("CLOSE");
@@ -95,8 +96,20 @@
             }
         }
     }
-
-    fit();
+    function waitForConnection(callback, interval) {
+        if (ws.readyState === 1) {
+            callback();
+        } else {
+            var that = this;
+            // optional: implement backoff for interval here
+            setTimeout(function () {
+                waitForConnection(callback, interval);
+            }, interval);
+        }
+    };
+    waitForConnection(function () {
+        fit()
+    }, 1000);
 
 
 </script>

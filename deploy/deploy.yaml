@@ -35,18 +35,32 @@ spec:
   ports:
     - port: 9999
       targetPort: 9999
-  type: NodePort
+  type: clusterIP
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: podinteractive
+  namespace: kube-system
+spec:
+  rules:
+    - host: www.podinteractive.com
+      http:
+        paths:
+          - backend:
+              serviceName: podinteractive
+              servicePort: 9999
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: podinteractive
-  namespace: default
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  namespace: default
+  namespace: kube-system
   name: podinteractive-role-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -55,18 +69,22 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: podinteractive
-    namespace: default
+    namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: podinteractive-role
-  namespace: default
+  namespace: kube-system
 rules:
   - apiGroups:
-      - ""
+      - '*'
     resources:
-      - pods
+      - '*'
     verbs:
-      - get
-      - list
+      - '*'
+  - nonResourceURLs:
+      - '*'
+    verbs:
+      - '*'
+

@@ -4,7 +4,7 @@
     <script src="/static/js/xterm/xterm.js"></script>
     <style>
         .xterm-screen {
-            height: 600px !important;
+            height: 700px !important;
         }
     </style>
 </head>
@@ -44,6 +44,7 @@
     ws = new WebSocket(path);
 
     ws.onopen = function (evt) {
+        fit();
     };
     ws.onmessage = function (evt) {
         term.write(evt.data);
