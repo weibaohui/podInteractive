@@ -21,16 +21,19 @@ func main() {
 	fmt.Println("SERVER 9999")
 	container := restful.NewContainer()
 	ws := new(restful.WebService)
-	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.PodLog))
-	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
+	ws.Route(ws.GET("/").To(page.Index))
 	ws.Route(ws.GET("/log").To(page.Log))
 	ws.Route(ws.GET("/exec").To(page.Exec))
-	ws.Route(ws.GET("/").To(page.Index))
 
-	ws.Route(ws.GET("/docker/exec").To(docker.Exec))
-	ws.Route(ws.GET("/docker/log").To(docker.Log))
-	ws.Route(ws.POST("/docker/resize").To(docker.Resize)).Produces(restful.MIME_JSON)
+	//pod
+	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.PodLog))
+	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
 	ws.Route(ws.POST("/pod/resize").To(pod.Resize)).Produces(restful.MIME_JSON)
+	
+	//docker
+	ws.Route(ws.GET("/docker/{containerId}/exec").To(docker.Exec))
+	ws.Route(ws.GET("/docker/{containerId}/log").To(docker.Log))
+	ws.Route(ws.POST("/docker/resize").To(docker.Resize)).Produces(restful.MIME_JSON)
 
 	container.Add(ws)
 

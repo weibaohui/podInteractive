@@ -1,11 +1,14 @@
 package pod
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
 	"github.com/weibaohui/podInteractive/pkg/constant"
 	"github.com/weibaohui/podInteractive/pkg/utils"
+	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -18,19 +21,19 @@ import (
 
 var terminalMaps sync.Map
 
-func saveTerminal(t *terminal) {
-	terminalMaps.Store(key(t), t)
+func (t *terminal) saveTerminal() {
+	terminalMaps.Store(t.key(), t)
 }
-func removeTerminal(t *terminal) {
-	terminalMaps.Delete(key(t))
+func (t *terminal) removeTerminal() {
+	terminalMaps.Delete(t.key())
 }
-func getTerminal(t *terminal) (*terminal, bool) {
-	if value, ok := terminalMaps.Load(key(t)); ok {
+func (t *terminal) getTerminal() (*terminal, bool) {
+	if value, ok := terminalMaps.Load(t.key()); ok {
 		return value.(*terminal), true
 	}
 	return nil, false
 }
-func key(t *terminal) string {
+func (t *terminal) key() string {
 	return fmt.Sprintf("%s/%s/%s", t.ns, t.podName, t.containerName)
 }
 
@@ -47,7 +50,13 @@ func (t *terminal) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	return copy(p, ps), nil
+	size := remotecommand.TerminalSize{}
+	if err = json.Unmarshal(ps, &size); err == nil {
+		t.size <- &size
+		return 0, nil
+	} else {
+		return copy(p, ps), nil
+	}
 }
 func (t *terminal) Write(p []byte) (n int, err error) {
 	writer, err := t.conn.NextWriter(websocket.TextMessage)
@@ -59,19 +68,22 @@ func (t *terminal) Write(p []byte) (n int, err error) {
 }
 func (t *terminal) Next() *remotecommand.TerminalSize {
 	sizes := <-t.size
-	fmt.Println("读取resize", sizes)
 	return sizes
 }
 
 func Resize(req *restful.Request, resp *restful.Response) {
 	t1 := &terminal{
-		ns:            "default",
-		podName:       "busybox-5b9f476c84-hfz8t",
-		containerName: "busybox",
+		ns:            req.QueryParameter("ns"),
+		podName:       req.QueryParameter("podName"),
+		containerName: req.QueryParameter("containerName"),
 	}
-	t, ok := getTerminal(t1)
+	if t1.containerName == "" {
+		cn, _ := GetFirstContainerName(t1.ns, t1.podName)
+		t1.containerName = cn
+	}
+	t, ok := t1.getTerminal()
 	if !ok {
-		resp.WriteErrorString(500, key(t1)+"没有 Exec 实例")
+		resp.WriteErrorString(500, t1.key()+"没有 Exec 实例")
 		return
 	}
 	size := &struct {
@@ -83,7 +95,6 @@ func Resize(req *restful.Request, resp *restful.Response) {
 		resp.WriteErrorString(500, err.Error())
 		return
 	}
-	fmt.Println(size)
 	t.size <- &remotecommand.TerminalSize{
 		Width:  size.Width,
 		Height: size.Height,
@@ -109,6 +120,9 @@ func PodExec(request *restful.Request, response *restful.Response) {
 	}
 	defer c.Close()
 
+	cancelCtx, cancel := context.WithCancel(request.Request.Context())
+	eg, ctx := errgroup.WithContext(cancelCtx)
+
 	t := &terminal{
 		conn:          c,
 		ns:            ns,
@@ -116,51 +130,54 @@ func PodExec(request *restful.Request, response *restful.Response) {
 		containerName: containerName,
 		size:          make(chan *remotecommand.TerminalSize, 1),
 	}
-	saveTerminal(t)
-	defer removeTerminal(t)
+	t.saveTerminal()
+	defer t.removeTerminal()
 
-	err = executor(t)
+	t.executor(ctx, eg)
+
+	err = eg.Wait()
 	if err != nil {
-		fmt.Println(err.Error())
+		cancel()
 	}
-
 }
 
-func executor(t *terminal) error {
+func (t *terminal) executor(ctx context.Context, eg *errgroup.Group) {
 
-	req := utils.Cli().CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(t.podName).
-		Namespace(t.ns).
-		SubResource("exec").
-		VersionedParams(
-			&v1.PodExecOptions{
-				TypeMeta:  v12.TypeMeta{},
-				Stdin:     true,
-				Stdout:    true,
-				TTY:       true,
-				Container: t.containerName,
-				Command:   constant.DefaultCommand,
-			},
-			scheme.ParameterCodec,
-		)
-	restConfig, err := clientcmd.BuildConfigFromFlags("", utils.KubeConfigPath())
-	if err != nil {
-		fmt.Errorf("clientcmd.BuildConfigFromFlags =%s ", err.Error())
+	eg.Go(func() error {
+		req := utils.Cli().CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(t.podName).
+			Namespace(t.ns).
+			SubResource("exec").
+			VersionedParams(
+				&v1.PodExecOptions{
+					TypeMeta:  v12.TypeMeta{},
+					Stdin:     true,
+					Stdout:    true,
+					TTY:       true,
+					Container: t.containerName,
+					Command:   constant.DefaultCommand,
+				},
+				scheme.ParameterCodec,
+			)
+		restConfig, err := clientcmd.BuildConfigFromFlags("", utils.KubeConfigPath())
+		if err != nil {
+			fmt.Errorf("clientcmd.BuildConfigFromFlags =%s ", err.Error())
+			return err
+		}
+		exec, err := remotecommand.NewSPDYExecutor(restConfig, http.MethodPost, req.URL())
+		if err != nil {
+			fmt.Errorf("remotecommand.NewSPDYExecutor =%s ", err.Error())
+			return err
+		}
+		err = exec.Stream(remotecommand.StreamOptions{
+			Stdin:             t,
+			Stdout:            t,
+			Stderr:            t,
+			Tty:               true,
+			TerminalSizeQueue: t,
+		})
 		return err
-	}
-	exec, err := remotecommand.NewSPDYExecutor(restConfig, http.MethodPost, req.URL())
-	if err != nil {
-		fmt.Errorf("remotecommand.NewSPDYExecutor =%s ", err.Error())
-		return err
-	}
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:             t,
-		Stdout:            t,
-		Stderr:            t,
-		Tty:               true,
-		TerminalSizeQueue: t,
 	})
-	return err
 
 }

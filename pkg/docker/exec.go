@@ -1,13 +1,16 @@
 package docker
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/astaxie/beego/httplib"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
 	"github.com/weibaohui/podInteractive/pkg/constant"
-	"io/ioutil"
+	"golang.org/x/sync/errgroup"
+	"k8s.io/client-go/tools/remotecommand"
 	"net"
 	"net/http"
 	"sync"
@@ -26,6 +29,7 @@ type terminal struct {
 	Address     string
 	ContainerId string
 	InstanceId  string
+	size        chan *remotecommand.TerminalSize
 }
 
 type execParam struct {
@@ -37,18 +41,14 @@ type execParam struct {
 	Privileged   bool     `json:"Privileged"`
 	Tty          bool     `json:"Tty"`
 }
-type execInstance struct {
+type instance struct {
 	Id string `json:"Id"`
 }
-type execStartParam struct {
-	Detach bool `json:"Detach"`
-	Tty    bool `json:"Tty"`
-}
 
-func saveTerminal(t *terminal) {
+func (t *terminal) saveTerminal() {
 	terminalMaps.Store(t.ContainerId, t)
 }
-func removeTerminal(t *terminal) {
+func (t *terminal) removeTerminal() {
 	terminalMaps.Delete(t.ContainerId)
 }
 func getTerminal(containerId string) (*terminal, bool) {
@@ -57,53 +57,53 @@ func getTerminal(containerId string) (*terminal, bool) {
 	}
 	return nil, false
 }
-func execShellStream(t *terminal) {
+func (t *terminal) execShellStream(ctx context.Context, eg *errgroup.Group) {
 
-	tcpConn, err := net.Dial("tcp", t.Address)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer tcpConn.Close()
-	data := "{\"Tty\":true}"
-	dataLength := len([]byte(data))
-	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.InstanceId, t.Address, fmt.Sprint(dataLength), data)
-	_, err = tcpConn.Write([]byte(body))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	go func() {
+	eg.Go(func() error {
+		tcpConn, err := net.Dial("tcp", t.Address)
+		if err != nil {
+			return err
+		}
+		defer tcpConn.Close()
+		data := "{\"Tty\":true}"
+		dataLength := len([]byte(data))
+		body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.InstanceId, t.Address, fmt.Sprint(dataLength), data)
+		_, err = tcpConn.Write([]byte(body))
+		if err != nil {
+			return err
+		}
+		go func() {
+			for {
+				bytes := make([]byte, 128)
+				_, err := tcpConn.Read(bytes)
+				t.conn.WriteMessage(websocket.TextMessage, bytes)
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+
+			}
+		}()
+
 		for {
-			bytes := make([]byte, 128)
-			_, err := tcpConn.Read(bytes)
-			t.conn.WriteMessage(websocket.TextMessage, bytes)
+			_, bytes, err := t.conn.ReadMessage()
 			if err != nil {
-				fmt.Println(err.Error())
-				return
+				return err
+			}
+			size := remotecommand.TerminalSize{}
+			if err = json.Unmarshal(bytes, &size); err == nil {
+				t.size <- &size
+			} else {
+				tcpConn.Write(bytes)
 			}
 		}
-	}()
+	})
 
-	for {
-		_, r, err := t.conn.NextReader()
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		bytes, err := ioutil.ReadAll(r)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-		tcpConn.Write(bytes)
-	}
 }
 
-func instanceId(t *terminal) (string, error) {
+func (t *terminal) instanceId() (string, error) {
 	// url := "http://134.44.36.120:2376/containers/f441cd3e0d5f1/exec"
 	url := fmt.Sprintf("http://%s/containers/%s/exec", t.Address, t.ContainerId)
-	fmt.Println(url)
 	param := &execParam{
 		AttachStdin:  true,
 		AttachStdout: true,
@@ -117,7 +117,7 @@ func instanceId(t *terminal) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	result := &execInstance{}
+	result := &instance{}
 	err = request.ToJSON(result)
 	if err != nil {
 		return "", err
@@ -128,26 +128,40 @@ func instanceId(t *terminal) (string, error) {
 	return result.Id, nil
 }
 
-func Resize(req *restful.Request, resp *restful.Response) {
-	///exec/{id}/resize?h=&w=
-	containerId := "f441cd3e0d5f"
+func (t *terminal) resizeFromWs(ctx context.Context, eg *errgroup.Group) {
+	eg.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case size := <-t.size:
+				doResize(t.ContainerId, size)
+			}
+		}
+	})
+}
+func doResize(containerId string, size *remotecommand.TerminalSize) error {
 	t, ok := getTerminal(containerId)
 	if !ok {
-		resp.WriteErrorString(500, containerId+"没有Exec Instance")
-		return
+		return errors.New(containerId + "没有Exec Instance")
 	}
-	size := &struct {
-		Width  int
-		Height int
-	}{}
+	url := fmt.Sprintf("http://%s/exec/%s/resize?h=%d&w=%d", t.Address, t.InstanceId, size.Height, size.Width)
+	_, err := httplib.Post(url).String()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Resize(req *restful.Request, resp *restful.Response) {
+	containerId := req.QueryParameter("containerId")
+	size := &remotecommand.TerminalSize{}
 	err := req.ReadEntity(size)
 	if err != nil {
 		resp.WriteErrorString(500, err.Error())
 		return
 	}
-	url := fmt.Sprintf("http://%s/exec/%s/resize?h=%d&w=%d", t.Address, t.InstanceId, size.Height, size.Width)
-	fmt.Println("resize", url)
-	_, err = httplib.Post(url).String()
+	err = doResize(containerId, size)
 	if err != nil {
 		resp.WriteErrorString(500, err.Error())
 		return
@@ -163,21 +177,31 @@ func Exec(req *restful.Request, resp *restful.Response) {
 		return
 	}
 	defer c.Close()
+	cancelCtx, cancel := context.WithCancel(req.Request.Context())
+	eg, ctx := errgroup.WithContext(cancelCtx)
+
 	t := &terminal{
 		conn:        c,
 		Address:     "134.44.36.120:2376",
-		ContainerId: "f441cd3e0d5f",
+		ContainerId: req.PathParameter("containerId"),
+		size:        make(chan *remotecommand.TerminalSize, 1),
 	}
-	id, err := instanceId(t)
+	id, err := t.instanceId()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	t.InstanceId = id
 
-	saveTerminal(t)
-	defer removeTerminal(t)
+	t.saveTerminal()
+	defer t.removeTerminal()
 
+	t.resizeFromWs(ctx, eg)
 	//获取exec into container
-	execShellStream(t)
+	t.execShellStream(ctx, eg)
+
+	err = eg.Wait()
+	if err != nil {
+		cancel()
+	}
 }
