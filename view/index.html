@@ -5,11 +5,18 @@
 </head>
 <body>
 <form>
+    <p>k8s pod ,docker container 二选一</p>
+    <hr>
+    <p>k8s pod</p>
     <p>ns:<input id="ns" type="text" value="default"></p>
     <p>podName<input id="podName" type="text" value="podName"></p>
     <p>containerName<input id="containerName" type="text" value=""></p>
     <hr>
+    <p>docker container</p>
     <p>containerId<input id="containerId" type="text" value=""></p>
+
+    <hr>
+
     <p><input type="button" id="log" value="生成log连接"> <input type="button" id="exec" value="生成exec连接"></p>
     <a href="" id="link" target="_blank"></a>
 </form>

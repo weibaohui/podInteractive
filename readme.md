@@ -1,6 +1,10 @@
 #
-本项目演示了如何通过web方式获取pod运行日志
-以及进入pod执行命令
+本项目利用k8s接口实现了web shell
+可以查看日志
+可以进入容器执行命令
+
+也可以通过配置ENV DOCKER_API_ADDRESS=ip:port 访问docker container
+不连接docker 可以不配置
 
 #quickstart
 1. kubectl apply -f deploy/deploy.yaml
@@ -13,5 +17,7 @@
 可以参考示例，将websocket接入到项目中
 
 #截图
+
 ![Log日志](https://github.com/weibaohui/podInteractive/blob/master/images/log.png)
+![Exec](https://github.com/weibaohui/podInteractive/blob/master/images/exec.png)
 
