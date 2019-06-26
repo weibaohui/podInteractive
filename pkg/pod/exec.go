@@ -58,24 +58,20 @@ func (t *terminal) Write(p []byte) (n int, err error) {
 	return writer.Write(p)
 }
 func (t *terminal) Next() *remotecommand.TerminalSize {
-	size := <-t.size
-	fmt.Println("读取 size", size)
-	return &remotecommand.TerminalSize{
-		Width:  235,
-		Height: 42,
-	}
-	//return size
+	sizes := <-t.size
+	fmt.Println("读取resize", sizes)
+	return sizes
 }
 
 func Resize(req *restful.Request, resp *restful.Response) {
-	t := &terminal{
-		ns:            "",
-		podName:       "",
-		containerName: "",
+	t1 := &terminal{
+		ns:            "default",
+		podName:       "busybox-5b9f476c84-hfz8t",
+		containerName: "busybox",
 	}
-	t, ok := getTerminal(t)
+	t, ok := getTerminal(t1)
 	if !ok {
-		resp.WriteErrorString(500, key(t)+"没有 Exec 实例")
+		resp.WriteErrorString(500, key(t1)+"没有 Exec 实例")
 		return
 	}
 	size := &struct {
@@ -87,6 +83,7 @@ func Resize(req *restful.Request, resp *restful.Response) {
 		resp.WriteErrorString(500, err.Error())
 		return
 	}
+	fmt.Println(size)
 	t.size <- &remotecommand.TerminalSize{
 		Width:  size.Width,
 		Height: size.Height,
@@ -117,6 +114,7 @@ func PodExec(request *restful.Request, response *restful.Response) {
 		ns:            ns,
 		podName:       podName,
 		containerName: containerName,
+		size:          make(chan *remotecommand.TerminalSize, 1),
 	}
 	saveTerminal(t)
 	defer removeTerminal(t)

@@ -30,6 +30,7 @@ func main() {
 	ws.Route(ws.GET("/docker/exec").To(docker.Exec))
 	ws.Route(ws.GET("/docker/log").To(docker.Log))
 	ws.Route(ws.POST("/docker/resize").To(docker.Resize)).Produces(restful.MIME_JSON)
+	ws.Route(ws.POST("/pod/resize").To(pod.Resize)).Produces(restful.MIME_JSON)
 
 	container.Add(ws)
 
