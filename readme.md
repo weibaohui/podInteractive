@@ -18,6 +18,7 @@
 
 #截图
 
+![Index](https://github.com/weibaohui/podInteractive/blob/master/images/index.png)
 ![Log日志](https://github.com/weibaohui/podInteractive/blob/master/images/log.png)
 ![Exec](https://github.com/weibaohui/podInteractive/blob/master/images/exec.png)
 
