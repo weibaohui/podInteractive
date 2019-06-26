@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: podinteractive
+  namespace: kube-system
   labels:
     app: podinteractive
 spec:
@@ -9,6 +10,7 @@ spec:
   template:
     metadata:
       name: podinteractive
+      namespace: kube-system
       labels:
         app: podinteractive
     spec:
@@ -29,13 +31,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: podinteractive
+  namespace: kube-system
 spec:
   selector:
     app: podinteractive
   ports:
     - port: 9999
       targetPort: 9999
-  type: clusterIP
+  type: ClusterIP
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
