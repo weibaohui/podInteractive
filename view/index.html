@@ -12,16 +12,10 @@
     <p>containerId<input id="containerId" type="text" value=""></p>
     <p><input type="button" id="log" value="生成log连接"> <input type="button" id="exec" value="生成exec连接"></p>
     <a href="" id="link" target="_blank"></a>
-
-
 </form>
 </body>
-
 <script>
-
-
     document.getElementById("log").onclick = function (evt) {
-
         var ns = document.getElementById("ns").value;
         var podName = document.getElementById("podName").value;
         var containerName = document.getElementById("containerName").value;
@@ -39,7 +33,6 @@
         return false;
     };
     document.getElementById("exec").onclick = function (evt) {
-
         var ns = document.getElementById("ns").value;
         var podName = document.getElementById("podName").value;
         var containerName = document.getElementById("containerName").value;
@@ -56,6 +49,5 @@
         document.getElementById("link").innerHTML = path;
         return false;
     };
-
 </script>
 </html>

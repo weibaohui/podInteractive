@@ -20,7 +20,7 @@ func Cli() *kubernetes.Clientset {
 
 var kubeConfigPath string
 
-func SetPath(path string) {
+func SetKubeConfigPath(path string) {
 	kubeConfigPath = path
 }
 func KubeConfigPath() string {

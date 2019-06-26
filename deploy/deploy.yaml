@@ -16,6 +16,9 @@ spec:
         - name: podinteractive
           image: weibh/podinteractive
           imagePullPolicy: IfNotPresent
+          env:
+            - name: DOCKER_API_ADDRESS
+              value: 134.44.36.120:2376
       restartPolicy: Always
       serviceAccountName: podinteractive
   selector:
@@ -52,6 +55,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: podinteractive
+    namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

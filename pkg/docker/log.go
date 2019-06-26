@@ -20,9 +20,13 @@ func Log(req *restful.Request, resp *restful.Response) {
 		return
 	}
 	defer c.Close()
+	address, err := address()
+	if err != nil {
+		resp.WriteError(500, err)
+	}
 	t := &terminal{
 		conn:        c,
-		Address:     "134.44.36.120:2376",
+		Address:     address,
 		ContainerId: req.PathParameter("containerId"),
 	}
 

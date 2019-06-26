@@ -16,7 +16,7 @@ func main() {
 	var path string
 	flag.StringVar(&path, "kubeconfig", "", "kubernetes config path")
 	flag.Parse()
-	utils.SetPath(path)
+	utils.SetKubeConfigPath(path)
 
 	fmt.Println("SERVER 9999")
 	container := restful.NewContainer()
@@ -29,7 +29,7 @@ func main() {
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/log").To(pod.PodLog))
 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec").To(pod.PodExec))
 	ws.Route(ws.POST("/pod/resize").To(pod.Resize)).Produces(restful.MIME_JSON)
-	
+
 	//docker
 	ws.Route(ws.GET("/docker/{containerId}/exec").To(docker.Exec))
 	ws.Route(ws.GET("/docker/{containerId}/log").To(docker.Log))

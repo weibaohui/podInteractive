@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:e5d8b169866840b22ecb59b9611cc4a43c0326c1ea4efefec98ad7cf71fdca34"
+  name = "github.com/astaxie/beego"
+  packages = ["httplib"]
+  pruneopts = "UT"
+  revision = "1b6edafc96ad27b6515fafeccd7339dda3e997b1"
+  version = "v1.11.1"
+
+[[projects]]
   digest = "1:6b21090f60571b20b3ddc2c8e48547dffcf409498ed6002c2cada023725ed377"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -424,6 +432,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/astaxie/beego/httplib",
     "github.com/emicklei/go-restful",
     "github.com/gorilla/websocket",
     "golang.org/x/sync/errgroup",
