@@ -8,22 +8,24 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/weibaohui/podInteractive/pkg/constant"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
+	"sync"
 )
 
-type terminal struct {
-	conn        *websocket.Conn
-	Address     string
-	ContainerId string
-	ShellId     string
-}
+var terminalMaps sync.Map
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+}
+
+type terminal struct {
+	conn        *websocket.Conn
+	Address     string
+	ContainerId string
+	InstanceId  string
 }
 
 type execParam struct {
@@ -35,7 +37,7 @@ type execParam struct {
 	Privileged   bool     `json:"Privileged"`
 	Tty          bool     `json:"Tty"`
 }
-type shellResult struct {
+type execInstance struct {
 	Id string `json:"Id"`
 }
 type execStartParam struct {
@@ -43,6 +45,18 @@ type execStartParam struct {
 	Tty    bool `json:"Tty"`
 }
 
+func saveTerminal(t *terminal) {
+	terminalMaps.Store(t.ContainerId, t)
+}
+func removeTerminal(t *terminal) {
+	terminalMaps.Delete(t.ContainerId)
+}
+func getTerminal(containerId string) (*terminal, bool) {
+	if value, ok := terminalMaps.Load(containerId); ok {
+		return value.(*terminal), true
+	}
+	return nil, false
+}
 func execShellStream(t *terminal) {
 
 	tcpConn, err := net.Dial("tcp", t.Address)
@@ -53,12 +67,12 @@ func execShellStream(t *terminal) {
 	defer tcpConn.Close()
 	data := "{\"Tty\":true}"
 	dataLength := len([]byte(data))
-	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.ShellId, t.Address, fmt.Sprint(dataLength), data)
+	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.InstanceId, t.Address, fmt.Sprint(dataLength), data)
 	_, err = tcpConn.Write([]byte(body))
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
+		return
 	}
-
 	go func() {
 		for {
 			bytes := make([]byte, 128)
@@ -69,7 +83,6 @@ func execShellStream(t *terminal) {
 				return
 			}
 		}
-
 	}()
 
 	for {
@@ -87,7 +100,7 @@ func execShellStream(t *terminal) {
 	}
 }
 
-func shellId(t *terminal) (string, error) {
+func instanceId(t *terminal) (string, error) {
 	// url := "http://134.44.36.120:2376/containers/f441cd3e0d5f1/exec"
 	url := fmt.Sprintf("http://%s/containers/%s/exec", t.Address, t.ContainerId)
 	fmt.Println(url)
@@ -104,16 +117,44 @@ func shellId(t *terminal) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	result := &shellResult{}
+	result := &execInstance{}
 	err = request.ToJSON(result)
 	if err != nil {
 		return "", err
 	}
 	if result.Id == "" {
-		return "", errors.New("shellId为空")
+		return "", errors.New("exec Instance Id为空")
 	}
 	return result.Id, nil
 }
+
+func Resize(req *restful.Request, resp *restful.Response) {
+	///exec/{id}/resize?h=&w=
+	containerId := "f441cd3e0d5f"
+	t, ok := getTerminal(containerId)
+	if !ok {
+		resp.WriteErrorString(500, containerId+"没有Exec Instance")
+		return
+	}
+	size := &struct {
+		Width  int
+		Height int
+	}{}
+	err := req.ReadEntity(size)
+	if err != nil {
+		resp.WriteErrorString(500, err.Error())
+		return
+	}
+	url := fmt.Sprintf("http://%s/exec/%s/resize?h=%d&w=%d", t.Address, t.InstanceId, size.Height, size.Width)
+	fmt.Println("resize", url)
+	_, err = httplib.Post(url).String()
+	if err != nil {
+		resp.WriteErrorString(500, err.Error())
+		return
+	}
+	resp.WriteAsJson(size)
+}
+
 func Exec(req *restful.Request, resp *restful.Response) {
 
 	c, err := upgrader.Upgrade(resp, req.Request, nil)
@@ -127,14 +168,16 @@ func Exec(req *restful.Request, resp *restful.Response) {
 		Address:     "134.44.36.120:2376",
 		ContainerId: "f441cd3e0d5f",
 	}
-	shellId, err := shellId(t)
+	id, err := instanceId(t)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	t.ShellId = shellId
-	fmt.Println(shellId)
-	fmt.Println(t.ShellId)
-	fmt.Println(t)
+	t.InstanceId = id
+
+	saveTerminal(t)
+	defer removeTerminal(t)
+
+	//获取exec into container
 	execShellStream(t)
 }

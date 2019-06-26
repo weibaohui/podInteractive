@@ -1,7 +1,6 @@
 package pod
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/emicklei/go-restful"
 	"github.com/gorilla/websocket"
@@ -14,7 +13,26 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"log"
 	"net/http"
+	"sync"
 )
+
+var terminalMaps sync.Map
+
+func saveTerminal(t *terminal) {
+	terminalMaps.Store(key(t), t)
+}
+func removeTerminal(t *terminal) {
+	terminalMaps.Delete(key(t))
+}
+func getTerminal(t *terminal) (*terminal, bool) {
+	if value, ok := terminalMaps.Load(key(t)); ok {
+		return value.(*terminal), true
+	}
+	return nil, false
+}
+func key(t *terminal) string {
+	return fmt.Sprintf("%s/%s/%s", t.ns, t.podName, t.containerName)
+}
 
 type terminal struct {
 	conn          *websocket.Conn
@@ -29,13 +47,7 @@ func (t *terminal) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	size := remotecommand.TerminalSize{}
-	if err = json.Unmarshal(ps, &size); err == nil {
-		t.size <- &size
-		return 0, nil
-	} else {
-		return copy(p, ps), nil
-	}
+	return copy(p, ps), nil
 }
 func (t *terminal) Write(p []byte) (n int, err error) {
 	writer, err := t.conn.NextWriter(websocket.TextMessage)
@@ -47,8 +59,39 @@ func (t *terminal) Write(p []byte) (n int, err error) {
 }
 func (t *terminal) Next() *remotecommand.TerminalSize {
 	size := <-t.size
-	fmt.Println("size", size)
-	return size
+	fmt.Println("读取 size", size)
+	return &remotecommand.TerminalSize{
+		Width:  235,
+		Height: 42,
+	}
+	//return size
+}
+
+func Resize(req *restful.Request, resp *restful.Response) {
+	t := &terminal{
+		ns:            "",
+		podName:       "",
+		containerName: "",
+	}
+	t, ok := getTerminal(t)
+	if !ok {
+		resp.WriteErrorString(500, key(t)+"没有 Exec 实例")
+		return
+	}
+	size := &struct {
+		Width  uint16
+		Height uint16
+	}{}
+	err := req.ReadEntity(size)
+	if err != nil {
+		resp.WriteErrorString(500, err.Error())
+		return
+	}
+	t.size <- &remotecommand.TerminalSize{
+		Width:  size.Width,
+		Height: size.Height,
+	}
+
 }
 
 // 	ws.Route(ws.GET("/ns/{ns}/podName/{podName}/exec")
@@ -75,6 +118,8 @@ func PodExec(request *restful.Request, response *restful.Response) {
 		podName:       podName,
 		containerName: containerName,
 	}
+	saveTerminal(t)
+	defer removeTerminal(t)
 
 	err = executor(t)
 	if err != nil {
