@@ -11,3 +11,7 @@
 
 #集成
 可以参考示例，将websocket接入到项目中
+
+#截图
+![Log日志](https://github.com/weibaohui/podInteractive/blob/master/images/log.png)
+
