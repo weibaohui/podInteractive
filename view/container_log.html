@@ -63,8 +63,8 @@
     var ns = getQueryStringByName("ns");
     var podName = getQueryStringByName("podName");
     var containerName = getQueryStringByName("containerName");
-    var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/log?containerName=" + containerName
-    {{/*var path = "ws://{{.}}/docker/log"*/}}
+    {{/*var path = "ws://{{.}}/ns/" + ns + "/podName/" + podName + "/log?containerName=" + containerName*/}}
+    var path = "ws://{{.}}/docker/log"
     ws = new WebSocket(path);
 
 

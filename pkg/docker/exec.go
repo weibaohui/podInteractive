@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 	"github.com/astaxie/beego/httplib"
 	"github.com/emicklei/go-restful"
@@ -16,7 +17,7 @@ type terminal struct {
 	conn        *websocket.Conn
 	Address     string
 	ContainerId string
-	shellId     string
+	ShellId     string
 }
 
 var upgrader = websocket.Upgrader{
@@ -34,9 +35,8 @@ type execParam struct {
 	Privileged   bool     `json:"Privileged"`
 	Tty          bool     `json:"Tty"`
 }
-type execId struct {
-	Id       string   `json:"Id"`
-	Warnings []string `json:"Warnings"`
+type shellResult struct {
+	Id string `json:"Id"`
 }
 type execStartParam struct {
 	Detach bool `json:"Detach"`
@@ -53,7 +53,7 @@ func execShellStream(t *terminal) {
 	defer tcpConn.Close()
 	data := "{\"Tty\":true}"
 	dataLength := len([]byte(data))
-	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.shellId, t.Address, fmt.Sprint(dataLength), data)
+	body := fmt.Sprintf("POST /exec/%s/start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %s\r\n\r\n%s", t.ShellId, t.Address, fmt.Sprint(dataLength), data)
 	_, err = tcpConn.Write([]byte(body))
 	if err != nil {
 		log.Println(err)
@@ -89,8 +89,8 @@ func execShellStream(t *terminal) {
 
 func shellId(t *terminal) (string, error) {
 	// url := "http://134.44.36.120:2376/containers/f441cd3e0d5f1/exec"
-	url := fmt.Sprintf("http://%s/contaners/%s/exec", t.Address, t.ContainerId)
-
+	url := fmt.Sprintf("http://%s/containers/%s/exec", t.Address, t.ContainerId)
+	fmt.Println(url)
 	param := &execParam{
 		AttachStdin:  true,
 		AttachStdout: true,
@@ -104,32 +104,37 @@ func shellId(t *terminal) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	execId := &execId{}
-	err = request.ToJSON(execId)
+	result := &shellResult{}
+	err = request.ToJSON(result)
 	if err != nil {
 		return "", err
 	}
-	return execId.Id, nil
+	if result.Id == "" {
+		return "", errors.New("shellId为空")
+	}
+	return result.Id, nil
 }
 func Exec(req *restful.Request, resp *restful.Response) {
 
 	c, err := upgrader.Upgrade(resp, req.Request, nil)
 	if err != nil {
-		log.Print("upgrade:", err)
+		fmt.Println("upgrade:", err)
 		return
 	}
 	defer c.Close()
 	t := &terminal{
 		conn:        c,
 		Address:     "134.44.36.120:2376",
-		ContainerId: "dd77b060d4c2",
+		ContainerId: "f441cd3e0d5f",
 	}
 	shellId, err := shellId(t)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	t.shellId = shellId
-
+	t.ShellId = shellId
+	fmt.Println(shellId)
+	fmt.Println(t.ShellId)
+	fmt.Println(t)
 	execShellStream(t)
 }
